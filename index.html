@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secure Vault Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #0f172a;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: #111827;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 12px;
+      border: none;
+      background: #1e293b;
+      color: white;
+      outline: none;
+    }
+
+    textarea {
+      resize: none;
+      height: 100px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 15px;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .vault-item {
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 15px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .logout-btn {
+      width: auto;
+      padding: 8px 14px;
+      background: #dc2626;
+    }
+
+    .badge {
+      background: #16a34a;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div id="loginScreen">
+      <h1>🔐 Secure Vault</h1>
+      <p class="subtitle">Store your confidential information securely</p>
+
+      <input type="password" id="pinInput" placeholder="Enter 4-digit PIN" maxlength="4" />
+      <button onclick="login()">Unlock Vault</button>
+    </div>
+
+    <div id="vaultScreen" class="hidden">
+      <div class="top-bar">
+        <div>
+          <h2>My Vault</h2>
+          <span class="badge">Encrypted</span>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
+
+      <input type="text" id="title" placeholder="Secret title" />
+      <textarea id="secret" placeholder="Enter confidential data..."></textarea>
+
+      <button onclick="saveSecret()">Save Secret</button>
+
+      <div id="vaultList"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const defaultPin = "1234";
+
+    function login() {
+      const pin = document.getElementById("pinInput").value;
+
+      if(pin === defaultPin) {
+        document.getElementById("loginScreen").classList.add("hidden");
+        document.getElementById("vaultScreen").classList.remove("hidden");
+        loadSecrets();
+      } else {
+        alert("Incorrect PIN");
+      }
+    }
+
+    function logout() {
+      document.getElementById("vaultScreen").classList.add("hidden");
+      document.getElementById("loginScreen").classList.remove("hidden");
+      document.getElementById("pinInput").value = "";
+    }
+
+    function encryptData(data) {
+      return btoa(data);
+    }
+
+    function decryptData(data) {
+      return atob(data);
+    }
+
+    function saveSecret() {
+      const title = document.getElementById("title").value;
+      const secret = document.getElementById("secret").value;
+
+      if(!title || !secret) {
+        alert("Please fill all fields");
+        return;
+      }
+
+      const existing = JSON.parse(localStorage.getItem("vaultData") || "[]");
+
+      existing.push({
+        title: encryptData(title),
+        secret: encryptData(secret)
+      });
+
+      localStorage.setItem("vaultData", JSON.stringify(existing));
+
+      document.getElementById("title").value = "";
+      document.getElementById("secret").value = "";
+
+      loadSecrets();
+    }
+
+    function loadSecrets() {
+      const vaultList = document.getElementById("vaultList");
+      const existing = JSON.parse(localStorage.getItem("vaultData") || "[]");
+
+      vaultList.innerHTML = "";
+
+      existing.forEach((item, index) => {
+        const div = document.createElement("div");
+        div.className = "vault-item";
+
+        div.innerHTML = `
+          <h3>${decryptData(item.title)}</h3>
+          <p>${decryptData(item.secret)}</p>
+          <button onclick="deleteSecret(${index})">Delete</button>
+        `;
+
+        vaultList.appendChild(div);
+      });
+    }
+
+    function deleteSecret(index) {
+      const existing = JSON.parse(localStorage.getItem("vaultData") || "[]");
+      existing.splice(index, 1);
+      localStorage.setItem("vaultData", JSON.stringify(existing));
+      loadSecrets();
+    }
+  </script>
+</body>
+</html>
