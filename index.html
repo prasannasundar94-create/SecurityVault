@@ -119,6 +119,405 @@ button:hover {
 </head>
 <body><div class="container">  <!-- Setup Screen -->  <div id="setupScreen">
     <h1>🔐 Secure Vault Setup</h1>
+    <p>Create or update your master password to secure the vault.</p><button onclick="resetMasterPassword()" style="background:#9333ea;">Change Existing Master Password</button>
+
+<input type="password" id="masterPasswordSetup" placeholder="Create Master Password" />
+<button onclick="setupMasterPassword()">Create Vault</button>
+
+  </div>  <!-- Login Screen -->  <div id="loginScreen" class="hidden">
+    <h1>🔓 Unlock Vault</h1>
+    <p>Enter your master password.</p><input type="password" id="masterPasswordLogin" placeholder="Enter Master Password" />
+<button onclick="login()">Unlock</button>
+
+  </div>  <!-- Dashboard -->  <div id="dashboard" class="hidden"><div class="top-bar">
+  <div>
+    <h1>🛡️ Advanced Secure Vault</h1>
+    <span class="badge">Multi-Level Security Enabled</span>
+  </div>
+  <button class="small-btn" onclick="logout()">Logout</button>
+</div>
+
+<!-- Category Creation -->
+<div class="section">
+  <h2>Create Protected Category</h2>
+  <input type="text" id="categoryName" placeholder="Category Name (Ex: Finance, Personal, Office)" />
+  <input type="password" id="categoryPassword" placeholder="Category Password" />
+  <button onclick="createCategory()">Create Category</button>
+</div>
+
+<!-- Category Access -->
+<div class="section">
+  <h2>Open Category</h2>
+  <select id="categorySelect"></select>
+  <input type="password" id="categoryAccessPassword" placeholder="Enter Category Password" />
+  <button onclick="openCategory()">Open Category</button>
+</div>
+
+<!-- Content Area -->
+<div id="contentArea" class="section hidden">
+  <h2 id="currentCategoryTitle"></h2>
+
+  <input type="text" id="noteTitle" placeholder="Content Title" />
+  <textarea id="noteContent" placeholder="Store confidential text or notes"></textarea>
+
+  <input type="file" id="fileUpload" multiple />
+
+  <button onclick="saveContent()">Save Content</button>
+
+  <div id="savedContent"></div>
+</div>
+
+  </div></div><script>
+  let currentCategory = "";
+
+  // Initialize
+  window.onload = function() {
+    const master = localStorage.getItem("masterPassword");
+
+    if(master) {
+      document.getElementById("setupScreen").classList.add("hidden");
+      document.getElementById("loginScreen").classList.remove("hidden");
+    }
+
+    loadCategories();
+  }
+
+  function encrypt(data) {
+    return btoa(data);
+  }
+
+  function decrypt(data) {
+    return atob(data);
+  }
+
+  function resetMasterPassword() {
+    const oldPass = prompt("Enter existing master password");
+
+    const stored = localStorage.getItem("masterPassword");
+
+    if(!stored) {
+      alert("No master password found");
+      return;
+    }
+
+    if(decrypt(stored) !== oldPass) {
+      alert("Wrong existing password");
+      return;
+    }
+
+    const newPass = prompt("Enter new master password");
+
+    if(!newPass) {
+      alert("Password cannot be empty");
+      return;
+    }
+
+    localStorage.setItem("masterPassword", encrypt(newPass));
+
+    alert("Master password updated successfully");
+  }
+
+  function setupMasterPassword() {
+    const pass = document.getElementById("masterPasswordSetup").value;
+
+    if(!pass) {
+      alert("Please create a master password");
+      return;
+    }
+
+    localStorage.setItem("masterPassword", encrypt(pass));
+
+    alert("Master password created successfully");
+
+    document.getElementById("setupScreen").classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+  }
+
+  function login() {
+    const entered = document.getElementById("masterPasswordLogin").value;
+    const stored = decrypt(localStorage.getItem("masterPassword"));
+
+    if(entered === stored) {
+      document.getElementById("loginScreen").classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+      loadCategories();
+    } else {
+      alert("Wrong master password");
+    }
+  }
+
+  function logout() {
+    document.getElementById("dashboard").classList.add("hidden");
+    document.getElementById("contentArea").classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+  }
+
+  function createCategory() {
+    const name = document.getElementById("categoryName").value;
+    const password = document.getElementById("categoryPassword").value;
+
+    if(!name || !password) {
+      alert("Enter category name and password");
+      return;
+    }
+
+    const categories = JSON.parse(localStorage.getItem("categories") || "[]");
+
+    categories.push({
+      name: name,
+      password: encrypt(password)
+    });
+
+    localStorage.setItem("categories", JSON.stringify(categories));
+
+    alert("Protected category created");
+
+    document.getElementById("categoryName").value = "";
+    document.getElementById("categoryPassword").value = "";
+
+    loadCategories();
+  }
+
+  function loadCategories() {
+    const categories = JSON.parse(localStorage.getItem("categories") || "[]");
+    const select = document.getElementById("categorySelect");
+
+    if(!select) return;
+
+    select.innerHTML = "";
+
+    categories.forEach(cat => {
+      const option = document.createElement("option");
+      option.value = cat.name;
+      option.textContent = cat.name;
+      select.appendChild(option);
+    });
+  }
+
+  function openCategory() {
+    const selected = document.getElementById("categorySelect").value;
+    const enteredPassword = document.getElementById("categoryAccessPassword").value;
+
+    const categories = JSON.parse(localStorage.getItem("categories") || "[]");
+
+    const found = categories.find(c => c.name === selected);
+
+    if(found && decrypt(found.password) === enteredPassword) {
+      currentCategory = selected;
+
+      document.getElementById("contentArea").classList.remove("hidden");
+      document.getElementById("currentCategoryTitle").textContent = "📁 " + selected;
+
+      loadContent();
+    } else {
+      alert("Invalid category password");
+    }
+  }
+
+  function saveContent() {
+    const title = document.getElementById("noteTitle").value;
+    const content = document.getElementById("noteContent").value;
+    const files = document.getElementById("fileUpload").files;
+
+    if(!title) {
+      alert("Please enter title");
+      return;
+    }
+
+    const data = JSON.parse(localStorage.getItem("vaultContent") || "[]");
+
+    const uploadedFiles = [];
+
+    if(files.length === 0 && !content) {
+      alert("Please add text or upload at least one file");
+      return;
+    }
+
+    for(let file of files) {
+      const reader = new FileReader();
+
+      uploadedFiles.push({
+        name: file.name,
+        type: file.type || 'Unknown',
+        size: (file.size / 1024).toFixed(2) + " KB",
+        preview: URL.createObjectURL(file)
+      });
+    }
+
+    data.push({
+      category: currentCategory,
+      title: encrypt(title),
+      content: encrypt(content),
+      files: uploadedFiles
+    });
+
+    localStorage.setItem("vaultContent", JSON.stringify(data));
+
+    alert("Content stored securely");
+
+    document.getElementById("noteTitle").value = "";
+    document.getElementById("noteContent").value = "";
+    document.getElementById("fileUpload").value = "";
+
+    loadContent();
+  }
+
+  function loadContent() {
+    const container = document.getElementById("savedContent");
+    const data = JSON.parse(localStorage.getItem("vaultContent") || "[]");
+
+    container.innerHTML = "";
+
+    const filtered = data.filter(item => item.category === currentCategory);
+
+    if(filtered.length === 0) {
+      container.innerHTML = '<p>No content stored in this category.</p>';
+      return;
+    }
+
+    filtered.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "card";
+
+      let filesHtml = "";
+
+      if(item.files.length > 0) {
+        filesHtml += '<h4 class="category-title">Uploaded Files</h4>';
+
+        item.files.forEach(file => {
+          if(file.type.startsWith('image/')) {
+            filesHtml += `
+              <div class="file-preview">
+                🖼️ ${file.name} - ${file.size}<br>
+                <img src="${file.preview}" style="width:120px;margin-top:10px;border-radius:10px;" />
+              </div>
+            `;
+          }
+          else if(file.type.startsWith('video/')) {
+            filesHtml += `
+              <div class="file-preview">
+                🎬 ${file.name} - ${file.size}<br>
+                <video controls style="width:200px;margin-top:10px;border-radius:10px;">
+                  <source src="${file.preview}" type="${file.type}">
+                </video>
+              </div>
+            `;
+          }
+          else if(file.type.startsWith('audio/')) {
+            filesHtml += `
+              <div class="file-preview">
+                🎵 ${file.name} - ${file.size}<br>
+                <audio controls style="margin-top:10px;">
+                  <source src="${file.preview}" type="${file.type}">
+                </audio>
+              </div>
+            `;
+          }
+          else {
+            filesHtml += `
+              <div class="file-preview">
+                📄 ${file.name} (${file.type}) - ${file.size}
+              </div>
+            `;
+          }
+        });
+      }
+
+      div.innerHTML = `
+        <h3>${decrypt(item.title)}</h3>
+        <p>${decrypt(item.content)}</p>
+        ${filesHtml}
+      `;
+
+      container.appendChild(div);
+    });
+  }
+</script></body>
+</html>input, textarea, select {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 12px;
+  border: none;
+  background: #1e293b;
+  color: white;
+  outline: none;
+}
+
+button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+.hidden {
+  display: none;
+}
+
+.section {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 16px;
+  margin-top: 20px;
+}
+
+.card {
+  background: #0f172a;
+  padding: 15px;
+  border-radius: 14px;
+  margin-top: 15px;
+  border: 1px solid #334155;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.small-btn {
+  width: auto;
+  padding: 10px 18px;
+  background: #dc2626;
+}
+
+.badge {
+  display: inline-block;
+  background: #16a34a;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.file-preview {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.category-title {
+  color: #60a5fa;
+  margin-top: 10px;
+}
+
+  </style>
+</head>
+<body><div class="container">  <!-- Setup Screen -->  <div id="setupScreen">
+    <h1>🔐 Secure Vault Setup</h1>
     <p>Create your master password to secure the vault.</p><input type="password" id="masterPasswordSetup" placeholder="Create Master Password" />
 <button onclick="setupMasterPassword()">Create Vault</button>
 
